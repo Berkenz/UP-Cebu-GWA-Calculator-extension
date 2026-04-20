@@ -1,0 +1,218 @@
+/* UP Cebu GWA Calculator Overlay */
+
+#gwa-overlay {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 250px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 13px;
+  z-index: 99999;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+#gwa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  background: #181825;
+  font-weight: 700;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+#gwa-toggle {
+  background: none;
+  border: none;
+  color: #6c7086;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+}
+#gwa-toggle:hover { color: #cdd6f4; }
+
+#gwa-body {
+  padding: 13px 14px 10px;
+  max-height: 540px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #313244 transparent;
+}
+
+.gwa-section-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #45475a;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.gwa-big {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  color: #a6e3a1;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.gwa-sub {
+  display: block;
+  font-size: 11px;
+  color: #585b70;
+  margin-top: 2px;
+  margin-bottom: 6px;
+}
+
+.gwa-na {
+  display: block;
+  font-size: 11px;
+  color: #45475a;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+/* ── Latin Honors Badge ── */
+.gwa-honors {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1.5px solid;
+  background: rgba(255,255,255,0.04);
+  margin: 4px 0 8px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Honors reference table ── */
+.gwa-honors-info {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 6px 8px 8px;
+  margin-top: 4px;
+}
+
+.gwa-honors-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 0;
+  color: #6c7086;
+}
+
+.gwa-honors-row span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Subject rows ── */
+#gwa-term-list,
+#gwa-cumulative-terms {
+  margin-bottom: 4px;
+}
+
+.gwa-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid #181825;
+  font-size: 11px;
+  gap: 4px;
+}
+
+.gwa-code {
+  flex: 1;
+  color: #7f849c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.gwa-units {
+  color: #45475a;
+  font-size: 10px;
+  min-width: 20px;
+  text-align: right;
+}
+
+.gwa-grade {
+  font-weight: 700;
+  color: #cba6f7;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.gwa-del {
+  background: none;
+  border: none;
+  color: #45475a;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.gwa-del:hover { color: #f38ba8; }
+
+/* ── Divider ── */
+.gwa-divider {
+  height: 1px;
+  background: #313244;
+  margin: 10px 0;
+}
+
+/* ── Action buttons ── */
+#gwa-actions {
+  display: flex;
+  gap: 6px;
+}
+
+#gwa-actions button {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+#gwa-save {
+  background: #313244;
+  color: #a6e3a1;
+}
+#gwa-save:hover { background: #3d4059; }
+#gwa-save:active { transform: scale(0.97); }
+
+#gwa-clear {
+  background: #313244;
+  color: #f38ba8;
+}
+#gwa-clear:hover { background: #3d4059; }
+#gwa-clear:active { transform: scale(0.97); }
+
+/* ── Flash message ── */
+.gwa-msg {
+  margin-top: 8px;
+  font-size: 11px;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  min-height: 0;
+  transition: all 0.2s;
+}
+.gwa-msg.success { color: #a6e3a1; background: rgba(166,227,161,0.08); }
+.gwa-msg.error   { color: #f38ba8; background: rgba(243,139,168,0.08); }

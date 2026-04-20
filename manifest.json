@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "UP Cebu GWA Calculator",
+  "version": "1.0",
+  "description": "Calculates GWA and shows Latin honors from UP Cebu AMIS",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://amis.upcebu.edu.ph/*",
+        "https://api-amis.upcebu.edu.ph/*"
+      ],
+      "js": ["content.js"],
+      "css": ["overlay.css"]
+    }
+  ]
+}
