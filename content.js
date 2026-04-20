@@ -10,16 +10,16 @@ let _saveTimer    = null; // debounce handle for delayed auto-save
 
 // ── Per-semester scholar status ──
 function getScholarHonors(gwa) {
-  if (gwa <= 1.45) return { title: 'University Scholar', cls: 'honor-univ',    icon: '⭐' };
-  if (gwa <= 1.75) return { title: 'College Scholar',    cls: 'honor-college', icon: '🎓' };
+  if (gwa <= 1.45) return { title: 'University Scholar', cls: 'honor-univ' };
+  if (gwa <= 1.75) return { title: 'College Scholar',    cls: 'honor-college' };
   return null;
 }
 
 // ── Graduation Latin Honors (cumulative GWA) ──
 function getLatinHonors(gwa) {
-  if (gwa <= 1.20) return { title: 'Summa Cum Laude', cls: 'honor-summa', icon: '🥇' };
-  if (gwa <= 1.45) return { title: 'Magna Cum Laude', cls: 'honor-magna', icon: '🥈' };
-  if (gwa <= 1.75) return { title: 'Cum Laude',       cls: 'honor-laude', icon: '🥉' };
+  if (gwa <= 1.20) return { title: 'Summa Cum Laude', cls: 'honor-summa' };
+  if (gwa <= 1.45) return { title: 'Magna Cum Laude', cls: 'honor-magna' };
+  if (gwa <= 1.75) return { title: 'Cum Laude',       cls: 'honor-laude' };
   return null;
 }
 
@@ -81,6 +81,19 @@ function watchTermSelector() {
   sync();
 }
 
+// ── Shorten a term name for compact display ──
+// "First Semester 2023-2024" → "1st Sem 2023-24"
+function shortTermName(term) {
+  const t = term.toLowerCase();
+  const sem = /first|1st/i.test(t)  ? '1st'
+            : /second|2nd/i.test(t) ? '2nd'
+            : /summer|mid/i.test(t) ? 'Sum'
+            : '';
+  const m = term.match(/(\d{4})-(\d{4})/);
+  if (sem && m) return `${sem} Sem ${m[1]}-${m[2].slice(2)}`;
+  return term.length > 22 ? term.slice(0, 22) + '…' : term;
+}
+
 // ── Chronological sort key for term names ──
 // e.g. "First Semester 2023-2024" → 20231, "Second Semester 2024-2025" → 20242
 function termSortKey(term) {
@@ -136,7 +149,7 @@ function showMsg(text, type) {
 function honorsHTML(gwa, fn = getLatinHonors) {
   const h = fn(gwa);
   if (!h) return '';
-  return `<span class="gwa-honors ${h.cls}">${h.icon} ${h.title}</span>`;
+  return `<span class="gwa-honors ${h.cls}">${h.title}</span>`;
 }
 
 // ── Update term display (UI only — no saving) ──
@@ -145,14 +158,22 @@ function updateTermDisplay(subjects) {
   const listEl   = document.getElementById('gwa-term-list');
   if (!resultEl) return;
 
+  const termNameEl = document.getElementById('gwa-term-name');
+
   if (!subjects.length) {
     resultEl.innerHTML = '<span class="gwa-na">Select a term above to load grades</span>';
     listEl.innerHTML = '';
+    if (termNameEl) termNameEl.textContent = '';
     return;
   }
 
   const gwa        = computeGWA(subjects);
   const totalUnits = subjects.reduce((s, x) => s + x.units, 0);
+
+  if (termNameEl) {
+    const term = getSelectedTerm();
+    termNameEl.textContent = term !== 'Unknown Term' ? shortTermName(term) : '';
+  }
 
   resultEl.innerHTML = `
     <span class="gwa-big">${gwa.toFixed(4)}</span>
@@ -251,33 +272,42 @@ function createOverlay() {
     <div id="gwa-header">
       <span class="gwa-header-title">GWA Calculator</span>
       <div class="gwa-header-actions">
-        <button id="gwa-theme" class="gwa-icon-btn" title="Toggle theme">☀️</button>
         <button id="gwa-toggle" class="gwa-icon-btn" title="Collapse">−</button>
       </div>
     </div>
     <div id="gwa-body">
 
-      <div class="gwa-section-label">THIS TERM</div>
-      <div id="gwa-term-result"><span class="gwa-na">Select a term to load grades</span></div>
-      <div id="gwa-term-list"></div>
-
-      <div class="gwa-divider"></div>
-
-      <div class="gwa-section-label">CUMULATIVE GWA <span class="gwa-auto-label">auto-tracked</span></div>
-      <div id="gwa-cumulative-result"><span class="gwa-na">Browse your terms above to auto-track them</span></div>
-      <div id="gwa-cumulative-terms"></div>
-
-      <div class="gwa-divider"></div>
-
-      <div id="gwa-actions">
-        <button id="gwa-clear">🗑 Clear all</button>
+      <div class="gwa-panel gwa-panel-term">
+        <div class="gwa-panel-hd">
+          <span class="gwa-section-label">THIS TERM</span>
+          <span id="gwa-term-name" class="gwa-term-name"></span>
+        </div>
+        <div id="gwa-term-result"><span class="gwa-na">Select a term to load grades</span></div>
+        <div id="gwa-term-list"></div>
       </div>
 
-      <div class="gwa-honors-info">
-        <div class="gwa-section-label" style="margin-top:10px">SEMESTRAL HONORS</div>
-        <div class="gwa-honors-row"><span class="clr-univ">⭐ Univ. Scholar</span><span>≤ 1.45</span></div>
-        <div class="gwa-honors-row"><span class="clr-college">🎓 College Scholar</span><span>≤ 1.75</span></div>
-        <div class="gwa-section-label" style="margin-top:8px">GRADUATION HONORS</div>
+      <div class="gwa-panel gwa-panel-cumul">
+        <div class="gwa-panel-hd">
+          <span class="gwa-section-label">CUMULATIVE GWA</span>
+          <span class="gwa-auto-label">auto-tracked</span>
+        </div>
+        <div id="gwa-cumulative-result"><span class="gwa-na">Browse your terms above to auto-track them</span></div>
+        <div id="gwa-cumulative-terms"></div>
+      </div>
+
+      <div id="gwa-actions">
+        <button id="gwa-clear">Clear all</button>
+      </div>
+
+      <div class="gwa-panel gwa-panel-info">
+        <div class="gwa-panel-hd">
+          <span class="gwa-section-label">SEMESTRAL HONORS</span>
+        </div>
+        <div class="gwa-honors-row"><span class="clr-univ">Univ. Scholar</span><span>≤ 1.45</span></div>
+        <div class="gwa-honors-row"><span class="clr-college">College Scholar</span><span>≤ 1.75</span></div>
+        <div class="gwa-panel-hd" style="margin-top:8px">
+          <span class="gwa-section-label">GRADUATION HONORS</span>
+        </div>
         <div class="gwa-honors-row"><span class="clr-summa">Summa Cum Laude</span><span>≤ 1.20</span></div>
         <div class="gwa-honors-row"><span class="clr-magna">Magna Cum Laude</span><span>≤ 1.45</span></div>
         <div class="gwa-honors-row"><span class="clr-laude">Cum Laude</span><span>≤ 1.75</span></div>
@@ -287,20 +317,6 @@ function createOverlay() {
     </div>
   `;
   document.body.appendChild(overlay);
-
-  // Theme toggle — load saved preference then wire button
-  const themeBtn = document.getElementById('gwa-theme');
-  chrome.storage.local.get(['theme'], res => {
-    if (res.theme === 'light') {
-      overlay.classList.add('gwa-light');
-      themeBtn.textContent = '🌙';
-    }
-  });
-  themeBtn.onclick = () => {
-    const isLight = overlay.classList.toggle('gwa-light');
-    themeBtn.textContent = isLight ? '🌙' : '☀️';
-    chrome.storage.local.set({ theme: isLight ? 'light' : 'dark' });
-  };
 
   // Collapse/expand
   let collapsed = false;
