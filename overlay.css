@@ -1,138 +1,225 @@
-/* UP Cebu GWA Calculator Overlay */
+/* UP Cebu GWA Calculator */
 
+/* ── CSS custom properties — dark mode (default) ── */
+#gwa-overlay {
+  --bg:            #111827;
+  --bg-raised:     #1f2937;
+  --bg-card:       rgba(55,65,81,0.45);
+  --bg-card-hover: rgba(55,65,81,0.75);
+  --bg-btn:        rgba(255,255,255,0.07);
+  --bg-btn-hover:  rgba(255,255,255,0.13);
+  --text:          #f9fafb;
+  --text-2:        #9ca3af;
+  --text-3:        #374151;
+  --border:        rgba(255,255,255,0.08);
+  --divider:       rgba(255,255,255,0.07);
+  --accent:        #34d399;
+  --accent-dim:    rgba(52,211,153,0.12);
+  --grade:         #a78bfa;
+  --summa:         #fbbf24;
+  --magna:         #c084fc;
+  --laude:         #38bdf8;
+  --univ:          #fbbf24;
+  --college:       #38bdf8;
+  --red:           #f87171;
+  --red-dim:       rgba(248,113,113,0.12);
+  --green:         #4ade80;
+  --green-dim:     rgba(74,222,128,0.1);
+  --shadow:        0 24px 60px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* ── Light mode overrides ── */
+#gwa-overlay.gwa-light {
+  --bg:            #ffffff;
+  --bg-raised:     #f3f4f6;
+  --bg-card:       #f9fafb;
+  --bg-card-hover: #f3f4f6;
+  --bg-btn:        rgba(0,0,0,0.05);
+  --bg-btn-hover:  rgba(0,0,0,0.1);
+  --text:          #111827;
+  --text-2:        #6b7280;
+  --text-3:        #d1d5db;
+  --border:        rgba(0,0,0,0.08);
+  --divider:       rgba(0,0,0,0.07);
+  --accent:        #059669;
+  --accent-dim:    rgba(5,150,105,0.1);
+  --grade:         #7c3aed;
+  --summa:         #d97706;
+  --magna:         #7c3aed;
+  --laude:         #0284c7;
+  --univ:          #d97706;
+  --college:       #0284c7;
+  --red:           #dc2626;
+  --red-dim:       rgba(220,38,38,0.08);
+  --green:         #16a34a;
+  --green-dim:     rgba(22,163,74,0.08);
+  --shadow:        0 8px 32px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.07);
+}
+
+/* ── Smooth theme transitions ── */
+#gwa-overlay { transition: box-shadow 0.25s; }
+#gwa-header, #gwa-body, .gwa-row, #gwa-clear,
+#gwa-term-result, #gwa-cumulative-result, .gwa-honors-info,
+.gwa-divider, .gwa-auto-label, .gwa-msg {
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+}
+
+/* ── Overlay shell ── */
 #gwa-overlay {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 250px;
-  background: #1e1e2e;
-  color: #cdd6f4;
-  border-radius: 16px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-  font-family: 'Segoe UI', sans-serif;
+  width: 268px;
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
   font-size: 13px;
   z-index: 99999;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.07);
 }
 
+/* ── Header ── */
 #gwa-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 11px 14px;
-  background: #181825;
+  padding: 11px 12px 11px 15px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.gwa-header-title {
   font-weight: 700;
   font-size: 13px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
-#gwa-toggle {
+.gwa-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gwa-icon-btn {
   background: none;
   border: none;
-  color: #6c7086;
-  font-size: 20px;
   cursor: pointer;
-  line-height: 1;
+  color: var(--text-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
   padding: 0;
-  transition: color 0.2s;
+  line-height: 1;
 }
-#gwa-toggle:hover { color: #cdd6f4; }
+.gwa-icon-btn:hover {
+  background: var(--bg-btn-hover);
+  color: var(--text);
+}
 
+/* ── Body ── */
 #gwa-body {
-  padding: 13px 14px 10px;
-  max-height: 540px;
+  padding: 14px 14px 12px;
+  max-height: 520px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #313244 transparent;
+  scrollbar-color: var(--border) transparent;
 }
 
+/* ── Section labels ── */
 .gwa-section-label {
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.1em;
-  color: #45475a;
-  margin-bottom: 6px;
+  letter-spacing: 0.12em;
+  color: var(--text-2);
+  margin-bottom: 8px;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Result cards ── */
+#gwa-term-result,
+#gwa-cumulative-result {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 13px;
+  margin-bottom: 8px;
 }
 
 .gwa-big {
   display: block;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 800;
-  color: #a6e3a1;
-  line-height: 1.1;
-  letter-spacing: -0.5px;
+  color: var(--accent);
+  line-height: 1;
+  letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .gwa-sub {
   display: block;
   font-size: 11px;
-  color: #585b70;
-  margin-top: 2px;
-  margin-bottom: 6px;
+  color: var(--text-2);
+  margin-top: 4px;
+  margin-bottom: 7px;
 }
 
 .gwa-na {
   display: block;
   font-size: 11px;
-  color: #45475a;
+  color: var(--text-2);
   font-style: italic;
-  margin-bottom: 4px;
 }
 
-/* ── Latin Honors Badge ── */
+/* ── Honors badge ── */
 .gwa-honors {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 3px 10px;
   border-radius: 20px;
-  border: 1.5px solid;
-  background: rgba(255,255,255,0.04);
-  margin: 4px 0 8px;
-  letter-spacing: 0.03em;
+  border: 1.5px solid currentColor;
+  letter-spacing: 0.02em;
 }
 
-/* ── Honors reference table ── */
-.gwa-honors-info {
-  background: rgba(255,255,255,0.03);
-  border-radius: 8px;
-  padding: 6px 8px 8px;
-  margin-top: 4px;
-}
+.honor-summa  { color: var(--summa); }
+.honor-magna  { color: var(--magna); }
+.honor-laude  { color: var(--laude); }
+.honor-univ   { color: var(--univ); }
+.honor-college{ color: var(--college); }
 
-.gwa-honors-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  padding: 2px 0;
-  color: #6c7086;
-}
-
-.gwa-honors-row span:last-child {
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Subject rows ── */
+/* ── Subject / term rows ── */
 #gwa-term-list,
 #gwa-cumulative-terms {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .gwa-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 3px 0;
-  border-bottom: 1px solid #181825;
+  padding: 4px 6px;
+  border-radius: 7px;
   font-size: 11px;
   gap: 4px;
+  transition: background 0.1s;
 }
+.gwa-row:hover { background: var(--bg-card-hover); }
 
 .gwa-code {
   flex: 1;
-  color: #7f849c;
+  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -140,15 +227,15 @@
 }
 
 .gwa-units {
-  color: #45475a;
+  color: var(--text-3);
   font-size: 10px;
-  min-width: 20px;
+  min-width: 22px;
   text-align: right;
 }
 
 .gwa-grade {
   font-weight: 700;
-  color: #cba6f7;
+  color: var(--grade);
   min-width: 34px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -157,62 +244,92 @@
 .gwa-del {
   background: none;
   border: none;
-  color: #45475a;
+  color: var(--text-3);
   cursor: pointer;
   font-size: 10px;
   padding: 0 2px;
   transition: color 0.15s;
   line-height: 1;
 }
-.gwa-del:hover { color: #f38ba8; }
+.gwa-del:hover { color: var(--red); }
 
 /* ── Divider ── */
 .gwa-divider {
   height: 1px;
-  background: #313244;
-  margin: 10px 0;
+  background: var(--divider);
+  margin: 12px 0;
 }
 
 /* ── Action buttons ── */
-#gwa-actions {
-  display: flex;
-  gap: 6px;
-}
+#gwa-actions { display: flex; }
 
-#gwa-actions button {
+#gwa-clear {
   flex: 1;
-  padding: 7px 4px;
-  border: none;
-  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  background: var(--bg-btn);
+  color: var(--red);
+  letter-spacing: 0.01em;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
-
-#gwa-save {
-  background: #313244;
-  color: #a6e3a1;
-}
-#gwa-save:hover { background: #3d4059; }
-#gwa-save:active { transform: scale(0.97); }
-
-#gwa-clear {
-  background: #313244;
-  color: #f38ba8;
-}
-#gwa-clear:hover { background: #3d4059; }
+#gwa-clear:hover  { background: var(--red-dim); border-color: var(--red); }
 #gwa-clear:active { transform: scale(0.97); }
+
+/* ── Auto-tracked pill ── */
+.gwa-auto-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 10px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+
+/* ── Honors reference table ── */
+.gwa-honors-info {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-top: 6px;
+}
+
+.gwa-honors-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.gwa-honors-row span:last-child {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.clr-summa  { color: var(--summa); }
+.clr-magna  { color: var(--magna); }
+.clr-laude  { color: var(--laude); }
+.clr-univ   { color: var(--univ); }
+.clr-college{ color: var(--college); }
 
 /* ── Flash message ── */
 .gwa-msg {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 11px;
   text-align: center;
-  padding: 5px 8px;
-  border-radius: 6px;
-  min-height: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
   transition: all 0.2s;
 }
-.gwa-msg.success { color: #a6e3a1; background: rgba(166,227,161,0.08); }
-.gwa-msg.error   { color: #f38ba8; background: rgba(243,139,168,0.08); }
+.gwa-msg.success { color: var(--green); background: var(--green-dim); }
+.gwa-msg.error   { color: var(--red);   background: var(--red-dim); }
