@@ -4,9 +4,23 @@
 const UNITS_COL = 2;
 const GRADE_COL = 3;
 
-let _cachedTerm   = null;
-let _lastSavedKey = '';   // term§gradesFingerprint — prevents duplicate saves
-let _saveTimer    = null; // debounce handle for delayed auto-save
+let _cachedTerm    = null;
+let _lastSavedKey  = '';   // term§gradesFingerprint — prevents duplicate saves
+let _saveTimer     = null; // debounce handle for delayed auto-save
+const _popTimers   = {};   // debounce handles keyed by panel selector
+
+// ── Trigger panel pop animation (debounced, double-rAF restart) ──
+function popPanel(selector) {
+  clearTimeout(_popTimers[selector]);
+  _popTimers[selector] = setTimeout(() => {
+    const panel = document.querySelector(selector);
+    if (!panel) return;
+    panel.classList.remove('gwa-panel-pop');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      panel.classList.add('gwa-panel-pop');
+    }));
+  }, 50);
+}
 
 // ── Per-semester scholar status ──
 function getScholarHonors(gwa) {
@@ -170,19 +184,21 @@ function updateTermDisplay(subjects) {
   const gwa        = computeGWA(subjects);
   const totalUnits = subjects.reduce((s, x) => s + x.units, 0);
 
+  const term = getSelectedTerm();
   if (termNameEl) {
-    const term = getSelectedTerm();
     termNameEl.textContent = term !== 'Unknown Term' ? shortTermName(term) : '';
   }
 
+  popPanel('.gwa-panel-term');
+
   resultEl.innerHTML = `
-    <span class="gwa-big">${gwa.toFixed(4)}</span>
-    <span class="gwa-sub">${subjects.length} subjects · ${totalUnits} units</span>
+    <span class="gwa-big gwa-pop-in">${gwa.toFixed(4)}</span>
+    <span class="gwa-sub gwa-pop-in" style="animation-delay:40ms">${subjects.length} subjects · ${totalUnits} units</span>
     ${honorsHTML(gwa, getScholarHonors)}
   `;
 
-  listEl.innerHTML = subjects.map(s => `
-    <div class="gwa-row">
+  listEl.innerHTML = subjects.map((s, i) => `
+    <div class="gwa-row gwa-pop-in" style="animation-delay:${60 + i * 35}ms">
       <span class="gwa-code">${s.code}</span>
       <span class="gwa-units">${s.units}u</span>
       <span class="gwa-grade">${s.grade.toFixed(2)}</span>
@@ -237,17 +253,19 @@ function updateCumulative() {
     });
     const cumulative = totalWeighted / totalUnits;
 
+    popPanel('.gwa-panel-cumul');
+
     resultEl.innerHTML = `
-      <span class="gwa-big">${cumulative.toFixed(4)}</span>
-      <span class="gwa-sub">${keys.length} term${keys.length > 1 ? 's' : ''} · ${totalUnits} total units</span>
+      <span class="gwa-big gwa-pop-in">${cumulative.toFixed(4)}</span>
+      <span class="gwa-sub gwa-pop-in" style="animation-delay:40ms">${keys.length} term${keys.length > 1 ? 's' : ''} · ${totalUnits} total units</span>
       ${honorsHTML(cumulative)}
     `;
 
-    termsEl.innerHTML = keys.map(k => `
-      <div class="gwa-row">
-        <span class="gwa-code" style="font-size:10px;max-width:130px">${k}</span>
-        <span class="gwa-grade">${history[k].gwa}</span>
+    termsEl.innerHTML = keys.map((k, i) => `
+      <div class="gwa-row gwa-pop-in" style="animation-delay:${60 + i * 35}ms">
         <button class="gwa-del" data-term="${k}" title="Remove term">✕</button>
+        <span class="gwa-code">${k}</span>
+        <span class="gwa-grade">${history[k].gwa}</span>
       </div>
     `).join('');
 
@@ -272,7 +290,7 @@ function createOverlay() {
     <div id="gwa-header">
       <span class="gwa-header-title">GWA Calculator</span>
       <div class="gwa-header-actions">
-        <button id="gwa-toggle" class="gwa-icon-btn" title="Collapse">−</button>
+        <button id="gwa-toggle" class="gwa-icon-btn" title="Collapse">▾</button>
       </div>
     </div>
     <div id="gwa-body">
@@ -303,7 +321,7 @@ function createOverlay() {
         <div class="gwa-panel-hd">
           <span class="gwa-section-label">SEMESTRAL HONORS</span>
         </div>
-        <div class="gwa-honors-row"><span class="clr-univ">Univ. Scholar</span><span>≤ 1.45</span></div>
+        <div class="gwa-honors-row"><span class="clr-univ">University Scholar</span><span>≤ 1.45</span></div>
         <div class="gwa-honors-row"><span class="clr-college">College Scholar</span><span>≤ 1.75</span></div>
         <div class="gwa-panel-hd" style="margin-top:8px">
           <span class="gwa-section-label">GRADUATION HONORS</span>
@@ -318,12 +336,77 @@ function createOverlay() {
   `;
   document.body.appendChild(overlay);
 
-  // Collapse/expand
+  // Collapse/expand with smooth height + opacity animation
   let collapsed = false;
-  document.getElementById('gwa-toggle').onclick = () => {
+  const toggleBtn = document.getElementById('gwa-toggle');
+  const body      = document.getElementById('gwa-body');
+
+  function clampToViewport(gap) {
+    const rect    = overlay.getBoundingClientRect();
+    const maxLeft = window.innerWidth  - overlay.offsetWidth  - gap;
+    const maxTop  = window.innerHeight - overlay.offsetHeight - gap;
+    const newLeft = Math.max(gap, Math.min(rect.left, maxLeft));
+    const newTop  = Math.max(gap, Math.min(rect.top,  maxTop));
+    if (newLeft !== rect.left || newTop !== rect.top) {
+      overlay.style.bottom = 'auto';
+      overlay.style.right  = 'auto';
+      overlay.style.left   = newLeft + 'px';
+      overlay.style.top    = newTop  + 'px';
+    }
+  }
+
+  // Track the active transitionend listener so rapid toggles can cancel it
+  let pendingTransition = null;
+
+  function cancelPending() {
+    if (!pendingTransition) return;
+    body.removeEventListener('transitionend', pendingTransition);
+    pendingTransition = null;
+  }
+
+  toggleBtn.onclick = () => {
     collapsed = !collapsed;
-    document.getElementById('gwa-body').style.display = collapsed ? 'none' : 'block';
-    document.getElementById('gwa-toggle').textContent = collapsed ? '+' : '−';
+    toggleBtn.classList.toggle('gwa-collapsed', collapsed);
+
+    // Cancel any in-flight animation before starting a new one
+    cancelPending();
+
+    if (collapsed) {
+      // Freeze at current mid-animation height, then animate to 0
+      body.style.height   = getComputedStyle(body).height;
+      body.style.overflow = 'hidden';
+      body.offsetHeight;  // force reflow so the freeze registers
+      requestAnimationFrame(() => {
+        body.style.height  = '0';
+        body.style.opacity = '0';
+      });
+      pendingTransition = e => {
+        if (e.propertyName !== 'height') return;
+        cancelPending();
+        body.style.display = 'none';
+        body.style.opacity = '';
+      };
+      body.addEventListener('transitionend', pendingTransition);
+
+    } else {
+      // Ensure visible, freeze at current height (may be mid-collapse or 0), animate to full
+      body.style.display  = 'block';
+      body.style.height   = getComputedStyle(body).height;
+      body.style.overflow = 'hidden';
+      body.offsetHeight;  // force reflow
+      requestAnimationFrame(() => {
+        body.style.height  = body.scrollHeight + 'px';
+        body.style.opacity = '1';
+      });
+      pendingTransition = e => {
+        if (e.propertyName !== 'height') return;
+        cancelPending();
+        body.style.height   = '';
+        body.style.overflow = '';
+        clampToViewport(EDGE_GAP);
+      };
+      body.addEventListener('transitionend', pendingTransition);
+    }
   };
 
   // Clear all history
@@ -333,6 +416,50 @@ function createOverlay() {
     showMsg('History cleared.', 'success');
     setTimeout(updateCumulative, 300);
   };
+
+  // Draggable overlay — constrained to viewport with edge gap
+  const header = document.getElementById('gwa-header');
+  const EDGE_GAP = 20;
+  let dragging = false, dragX, dragY, startLeft, startTop;
+
+  header.addEventListener('mousedown', e => {
+    if (e.target.closest('button')) return;
+
+    // Convert bottom/right anchor to top/left for drag math
+    const rect = overlay.getBoundingClientRect();
+    overlay.style.bottom = 'auto';
+    overlay.style.right  = 'auto';
+    overlay.style.top    = rect.top  + 'px';
+    overlay.style.left   = rect.left + 'px';
+
+    dragging  = true;
+    dragX     = e.clientX;
+    dragY     = e.clientY;
+    startLeft = rect.left;
+    startTop  = rect.top;
+    header.style.cursor = 'grabbing';
+    overlay.classList.add('gwa-lifted', 'gwa-dragging');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+
+    const newLeft = startLeft + (e.clientX - dragX);
+    const newTop  = startTop  + (e.clientY - dragY);
+    const maxLeft = window.innerWidth  - overlay.offsetWidth  - EDGE_GAP;
+    const maxTop  = window.innerHeight - overlay.offsetHeight - EDGE_GAP;
+
+    overlay.style.left = Math.max(EDGE_GAP, Math.min(newLeft, maxLeft)) + 'px';
+    overlay.style.top  = Math.max(EDGE_GAP, Math.min(newTop,  maxTop))  + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    header.style.cursor = 'grab';
+    overlay.classList.remove('gwa-lifted', 'gwa-dragging');
+  });
 }
 
 // ── Poll the grade table every 250 ms for changes ──
