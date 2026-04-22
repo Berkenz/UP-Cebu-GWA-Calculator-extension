@@ -3,8 +3,23 @@
   "name": "UP Cebu GWA Calculator",
   "version": "1.0",
   "description": "Calculates GWA and shows Latin honors from UP Cebu AMIS",
-  "permissions": ["storage"],
+  "permissions": ["storage", "cookies"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://amis.upcebu.edu.ph/*",
+    "https://api-amis.upcebu.edu.ph/*"
+  ],
   "content_scripts": [
+    {
+      "matches": [
+        "https://amis.upcebu.edu.ph/*",
+        "https://api-amis.upcebu.edu.ph/*"
+      ],
+      "js": ["inject-bearer.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "https://amis.upcebu.edu.ph/*",
@@ -12,6 +27,15 @@
       ],
       "js": ["content.js"],
       "css": ["overlay.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page-bearer.js"],
+      "matches": [
+        "https://amis.upcebu.edu.ph/*",
+        "https://api-amis.upcebu.edu.ph/*"
+      ]
     }
   ]
 }
