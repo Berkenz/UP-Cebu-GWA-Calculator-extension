@@ -456,11 +456,40 @@ button.gwa-term-select:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* THIS TERM — fixed column grid: code | units | grade | omit */
+#gwa-term-list .gwa-term-course-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.5rem 3.25rem 1.875rem;
+  column-gap: 6px;
+  align-items: center;
+  padding: 5px 6px;
+  font-variant-numeric: tabular-nums;
+}
+#gwa-term-list .gwa-term-course-row .gwa-code {
+  flex: unset;
+  max-width: none;
+  min-width: 0;
+}
+#gwa-term-list .gwa-term-course-row .gwa-units {
+  justify-self: end;
+  min-width: 0;
+  font-size: 11px;
+}
+#gwa-term-list .gwa-term-course-row .gwa-grade,
+#gwa-term-list .gwa-term-course-row .gwa-grade.gwa-grade-excl {
+  justify-self: end;
+  min-width: 0;
+  width: 100%;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* PE / NSTP — not in academic GWA; grade shown in parentheses */
 #gwa-term-list .gwa-grade-excl {
   color: var(--text-3);
   font-weight: 600;
-  min-width: 44px;
+  min-width: 0;
 }
 
 .gwa-del {
@@ -475,6 +504,45 @@ button.gwa-term-select:disabled {
   flex-shrink: 0;
 }
 .gwa-del:hover { color: var(--red); }
+
+#gwa-term-list .gwa-omit-slot {
+  display: block;
+  width: 1.75rem;
+  height: 22px;
+  justify-self: end;
+  flex-shrink: 0;
+  pointer-events: none;
+  visibility: hidden; /* holds column width like the button */
+}
+
+/* Omit / restore one course for GWA (THIS TERM) */
+#gwa-term-list .gwa-omit {
+  flex-shrink: 0;
+  width: 1.75rem;
+  min-width: 1.75rem;
+  height: 22px;
+  padding: 0 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-btn);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  margin: 0;
+  justify-self: end;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+#gwa-term-list .gwa-omit:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+#gwa-term-list .gwa-omit[aria-pressed="true"] {
+  color: var(--warn, #b45309);
+  border-color: var(--border);
+}
 
 /* Cumulative term rows: × | term name (flex) | GWA right-anchored */
 #gwa-cumulative-terms .gwa-row {

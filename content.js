@@ -7,6 +7,10 @@ let _termPickerByLabel = {};
 /** Active term key, or "" if none; drives the THIS TERM control. */
 let _termPickerValue = '';
 const _GWA_LAST_TERM_KEY = 'gwaLastSelectedTerm';
+const _GWA_USER_EXCLUDED_KEY = 'gwaUserExcludedSubjects';
+
+/** @type {Record<string, string[]>} term label → course codes omitted from GWA (user toggle). */
+let _gwaUserExcluded = {};
 
 // ── Trigger panel pop animation (debounced, double-rAF restart) ──
 function popPanel(selector) {
@@ -163,17 +167,21 @@ function getSelectedTermLabel() {
   return _termPickerValue || '';
 }
 
-function renderSelectedTermFromPicker() {
+/**
+ * @param {object} [opts] — `panelPop: false` + `animate: false` for omit/include toggles (no pop animation).
+ */
+function renderSelectedTermFromPicker(opts = {}) {
   const label = getSelectedTermLabel();
   const d     = _termPickerByLabel[label];
-  updateTermDisplay(d && d.subjects ? d.subjects : null);
+  updateTermDisplay(d && d.subjects ? d.subjects : null, opts);
 }
 
 /**
  * Binds the THIS TERM list and in-memory index. Cumulative `termHistory` is written only
  * via Import all (not here).
+ * @param {{ restoreLabel?: string }} [opts] — if `restoreLabel` still exists after fetch, keep it selected (e.g. after Refresh terms).
  */
-function applySummarizeTermsToPicker(terms) {
+function applySummarizeTermsToPicker(terms, opts) {
   _termPickerByLabel = {};
   _termPickerValue   = '';
   const btn  = getTermButtonEl();
@@ -199,17 +207,17 @@ function applySummarizeTermsToPicker(terms) {
 
   const sorted = [...terms].sort((a, b) => termSortKey(a.label) - termSortKey(b.label));
   for (const t of sorted) {
+    const rec = recomputeTermEntryFromSubjects(t.subjects || [], t.label);
     _termPickerByLabel[t.label] = {
       subjects: t.subjects || [],
-      gwa: t.gwa,
-      totalUnits: t.totalUnits,
-      count: t.count,
-      weightSum: t.weightSum
+      gwa: rec.gwa,
+      totalUnits: rec.totalUnits,
+      count: rec.count,
+      weightSum: rec.weightSum
     };
   }
 
   btn.disabled   = false;
-  lbl.textContent  = 'Select a term…';
   menu.innerHTML = sorted.map(t => {
     const show = formatTermLabelForDisplay(t.label);
     return `<li role="option" class="gwa-term-menu-item" data-value="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}">${escapeHtml(show)}</li>`;
@@ -240,6 +248,25 @@ function applySummarizeTermsToPicker(terms) {
     });
   });
 
+  const rlab = opts && typeof opts.restoreLabel === 'string' ? opts.restoreLabel.trim() : '';
+  if (rlab && _termPickerByLabel[rlab]) {
+    _termPickerValue = rlab;
+    lbl.textContent  = formatTermLabelForDisplay(rlab);
+    if (btn) btn.title = rlab;
+    try {
+      chrome.storage.local.set({ [_GWA_LAST_TERM_KEY]: rlab });
+    } catch (err) { /* ignore */ }
+  } else {
+    if (rlab) {
+      try {
+        chrome.storage.local.remove(_GWA_LAST_TERM_KEY);
+      } catch (err) { /* ignore */ }
+    }
+    _termPickerValue   = '';
+    lbl.textContent  = 'Select a term…';
+    if (btn) btn.title = '';
+  }
+
   bindTermComboboxClicks();
   renderSelectedTermFromPicker();
 }
@@ -248,6 +275,7 @@ async function loadTermPickerFromApi() {
   const btn = getTermButtonEl();
   const lbl = getTermButtonLabelEl();
   const m   = getTermMenuEl();
+  const keepTerm = getSelectedTermLabel();
   if (btn) {
     btn.disabled = true;
   }
@@ -266,7 +294,7 @@ async function loadTermPickerFromApi() {
     return;
   }
   const terms = parseStudentGradesJson(data);
-  applySummarizeTermsToPicker(terms);
+  applySummarizeTermsToPicker(terms, { restoreLabel: keepTerm || undefined });
   if (!terms.length) {
     showMsg('No terms in the grades response.', 'error');
   }
@@ -394,9 +422,45 @@ function isExcludedFromCumulativeGwaCourse(courseCode) {
   return false;
 }
 
-function subjectsForGwa(subjects) {
+function normalizeCourseCodeForKey(courseCode) {
+  return (courseCode || '')
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isUserExcludedForTerm(termLabel, courseCode) {
+  if (!termLabel) return false;
+  const c = normalizeCourseCodeForKey(courseCode);
+  if (!c) return false;
+  const arr = _gwaUserExcluded[termLabel];
+  if (!arr || !arr.length) return false;
+  return arr.some((x) => normalizeCourseCodeForKey(x) === c);
+}
+
+function subjectsForGwa(subjects, termLabel) {
   if (!subjects || !subjects.length) return [];
-  return subjects.filter(s => s && !isExcludedFromCumulativeGwaCourse(s.code));
+  return subjects.filter(s => {
+    if (!s) return false;
+    if (isExcludedFromCumulativeGwaCourse(s.code)) return false;
+    if (termLabel && isUserExcludedForTerm(termLabel, s.code)) return false;
+    return true;
+  });
+}
+
+function recomputeTermEntryFromSubjects(subjects, termLabel) {
+  const forGwa = subjectsForGwa(subjects, termLabel);
+  if (!forGwa.length) {
+    return { gwa: null, totalUnits: 0, count: 0, weightSum: null };
+  }
+  const gwa = computeGWA(forGwa);
+  return {
+    gwa,
+    totalUnits: forGwa.reduce((s, x) => s + x.units, 0),
+    count: forGwa.length,
+    weightSum: subjectListWeightSum(forGwa)
+  };
 }
 
 function subjectListWeightSum(subjects) {
@@ -405,15 +469,85 @@ function subjectListWeightSum(subjects) {
 }
 
 function loadHistory(callback) {
-  chrome.storage.local.get(['termHistory'], res => callback(res.termHistory || {}));
+  chrome.storage.local.get(['termHistory'], (res) => callback(res.termHistory || {}));
 }
 
 function deleteTerm(term) {
-  chrome.storage.local.get(['termHistory'], res => {
+  chrome.storage.local.get(['termHistory', _GWA_USER_EXCLUDED_KEY], (res) => {
     const history = res.termHistory || {};
     delete history[term];
-    chrome.storage.local.set({ termHistory: history });
+    const ex = { ...(res[_GWA_USER_EXCLUDED_KEY] || {}) };
+    delete ex[term];
+    _gwaUserExcluded = ex;
+    chrome.storage.local.set({ termHistory: history, [_GWA_USER_EXCLUDED_KEY]: ex });
   });
+}
+
+function recomputeAndPersistTerm(termLabel) {
+  if (!termLabel) return;
+  chrome.storage.local.get(['termHistory'], (res) => {
+    const h  = { ...(res.termHistory || {}) };
+    const t0 = h[termLabel];
+    const fromPicker = _termPickerByLabel[termLabel];
+    const subjects =
+      t0 && t0.subjects && t0.subjects.length
+        ? t0.subjects
+        : fromPicker && fromPicker.subjects && fromPicker.subjects.length
+          ? fromPicker.subjects
+          : null;
+    if (!subjects || !subjects.length) {
+      showMsg('No course data for this term. Refresh terms or use Import all.', 'success');
+      return;
+    }
+    const rec = recomputeTermEntryFromSubjects(subjects, termLabel);
+    if (rec.gwa == null || !rec.totalUnits) {
+      h[termLabel] = {
+        ...t0,
+        gwa: '0.0000',
+        totalUnits: 0,
+        count: 0,
+        weightSum: 0,
+        subjects
+      };
+    } else {
+      h[termLabel] = {
+        ...t0,
+        gwa: rec.gwa.toFixed(4),
+        totalUnits: rec.totalUnits,
+        count: rec.count,
+        weightSum: rec.weightSum,
+        subjects
+      };
+    }
+    chrome.storage.local.set({ termHistory: h }, () => updateCumulative({ force: true }));
+  });
+}
+
+function toggleUserExclusion(termLabel, courseCode, done) {
+  const c = normalizeCourseCodeForKey(courseCode);
+  if (!termLabel || !c) {
+    if (done) done();
+    return;
+  }
+  const prev = _gwaUserExcluded[termLabel] || [];
+  let arr = prev.map((x) => normalizeCourseCodeForKey(x));
+  const idx = arr.indexOf(c);
+  if (idx >= 0) {
+    arr = arr.filter((_, i) => i !== idx);
+  } else {
+    arr = arr.concat(c);
+  }
+  const next = { ..._gwaUserExcluded };
+  if (arr.length) next[termLabel] = arr;
+  else delete next[termLabel];
+  _gwaUserExcluded = next;
+  try {
+    chrome.storage.local.set({ [_GWA_USER_EXCLUDED_KEY]: _gwaUserExcluded }, () => {
+      if (typeof done === 'function') done();
+    });
+  } catch (e) {
+    if (typeof done === 'function') done();
+  }
 }
 
 // ── Show flash message ──
@@ -445,7 +579,9 @@ function honorsHTML(gwa, fn = getLatinHonors) {
 }
 
 // ── Update term display (UI only — no saving) ──
-function updateTermDisplay(subjects) {
+function updateTermDisplay(subjects, opts = {}) {
+  const panelPop = opts.panelPop !== false;
+  const animate  = opts.animate !== false;
   const resultEl = document.getElementById('gwa-term-result');
   const listEl   = document.getElementById('gwa-term-list');
   if (!resultEl) return;
@@ -468,14 +604,20 @@ function updateTermDisplay(subjects) {
     return;
   }
 
-  const gwaRows  = subjectsForGwa(subjects);
+  const termLabel = getSelectedTermLabel();
+  const gwaRows   = subjectsForGwa(subjects, termLabel);
 
-  popPanel('.gwa-panel-term');
+  if (panelPop) {
+    popPanel('.gwa-panel-term');
+  }
+
+  const pIn  = animate ? ' gwa-pop-in' : '';
+  const subAD = animate ? ' style="animation-delay:40ms"' : '';
 
   if (!gwaRows.length) {
     const uAll = subjects.reduce((s, x) => s + x.units, 0);
     resultEl.innerHTML = `
-      <span class="gwa-na gwa-pop-in">No GWA-qualifying load (e.g. only PE / NSTP)</span>
+      <span class="gwa-na${pIn}">No GWA-qualifying load (e.g. only PE / NSTP, or all omitted)</span>
       <span class="gwa-sub" style="display:block;margin-top:4px;opacity:0.85">${subjects.length} course${subjects.length > 1 ? 's' : ''} shown · ${uAll} u total</span>
     `;
   } else {
@@ -485,31 +627,50 @@ function updateTermDisplay(subjects) {
       ? `${gwaRows.length} subjects · ${uGwa} units`
       : `${gwaRows.length} of ${subjects.length} in GWA · ${uGwa} u`;
     resultEl.innerHTML = `
-    <span class="gwa-big gwa-pop-in">${gwa != null ? gwa.toFixed(4) : '—'}</span>
-    <span class="gwa-sub gwa-pop-in" style="animation-delay:40ms">${subLine}</span>
+    <span class="gwa-big${pIn}">${gwa != null ? gwa.toFixed(4) : '—'}</span>
+    <span class="gwa-sub${pIn}"${subAD}>${subLine}</span>
     ${gwa != null ? honorsHTML(gwa, getScholarHonors) : ''}
   `;
   }
 
+  const rowIn = animate ? ' gwa-pop-in' : '';
   listEl.innerHTML = subjects.map((s, i) => {
     const gStr = s.grade != null && !isNaN(Number(s.grade)) ? Number(s.grade).toFixed(2) : '—';
-    const excluded = isExcludedFromCumulativeGwaCourse(s.code);
-    const gradeText = excluded ? `(${gStr})` : gStr;
+    const policyExcl = isExcludedFromCumulativeGwaCourse(s.code);
+    const userExcl   = !policyExcl && termLabel && isUserExcludedForTerm(termLabel, s.code);
+    const showAsExcluded = policyExcl || userExcl;
+    const gradeText  = showAsExcluded ? `(${gStr})` : gStr;
+    const omitCell   = policyExcl
+      ? '<span class="gwa-omit-slot" aria-hidden="true"></span>'
+      : `<button type="button" class="gwa-omit" data-code="${escapeAttr(String(s.code))}" aria-pressed="${userExcl ? 'true' : 'false'}" aria-label="${userExcl ? 'Include in GWA' : 'Omit from GWA'}" title="${userExcl ? 'Include in GWA' : 'Omit from GWA'}">${userExcl ? '+' : '−'}</button>`;
+    const rowSt = animate ? ` style="animation-delay:${60 + i * 35}ms"` : '';
     return `
-    <div class="gwa-row gwa-pop-in${excluded ? ' gwa-row-excl' : ''}" style="animation-delay:${60 + i * 35}ms">
+    <div class="gwa-row gwa-term-course-row${rowIn}${showAsExcluded ? ' gwa-row-excl' : ''}"${rowSt}>
       <span class="gwa-code">${escapeHtml(String(s.code))}</span>
       <span class="gwa-units">${s.units}u</span>
-      <span class="gwa-grade${excluded ? ' gwa-grade-excl' : ''}">${gradeText}</span>
+      <span class="gwa-grade${showAsExcluded ? ' gwa-grade-excl' : ''}">${gradeText}</span>
+      ${omitCell}
     </div>
   `;
   }).join('');
 }
 
+function buildCumulativeExclusionSig() {
+  const o = _gwaUserExcluded || {};
+  return Object.keys(o)
+    .sort()
+    .map((k) => {
+      const arr = o[k] || [];
+      return k + '§' + arr.map((c) => normalizeCourseCodeForKey(c)).filter(Boolean).sort().join(',');
+    })
+    .join('|');
+}
+
 function buildCumulativeDataSig(history) {
-  if (!history || !Object.keys(history).length) return 'EMPTY';
+  if (!history || !Object.keys(history).length) return 'EMPTY||' + buildCumulativeExclusionSig();
   const keys = Object.keys(history).sort((a, b) => termSortKey(a) - termSortKey(b));
-  return keys
-    .map(k => {
+  const body = keys
+    .map((k) => {
       const t = history[k];
       return [
         k,
@@ -519,6 +680,7 @@ function buildCumulativeDataSig(history) {
       ].join('§');
     })
     .join('\n');
+  return buildCumulativeExclusionSig() + '||' + body;
 }
 
 /**
@@ -528,7 +690,7 @@ function buildCumulativeDataSig(history) {
 function canSkipCumulativeRender(resultEl, targetSig, cumStr, force) {
   if (force) return false;
   if (resultEl.getAttribute('data-cum-sig') !== targetSig) return false;
-  if (targetSig === 'EMPTY') {
+  if (String(targetSig).indexOf('EMPTY||') === 0) {
     return resultEl.textContent && resultEl.textContent.indexOf('Import all') >= 0;
   }
   const big = resultEl.querySelector('.gwa-big');
@@ -550,8 +712,9 @@ function updateCumulative(options = {}) {
 
     const keys = Object.keys(history).sort((a, b) => termSortKey(a) - termSortKey(b));
     if (!keys.length) {
-      if (canSkipCumulativeRender(resultEl, 'EMPTY', null, force)) return;
-      resultEl.setAttribute('data-cum-sig', 'EMPTY');
+      const emptySig = buildCumulativeDataSig({});
+      if (canSkipCumulativeRender(resultEl, emptySig, null, force)) return;
+      resultEl.setAttribute('data-cum-sig', emptySig);
       resultEl.innerHTML  = '<span class="gwa-na">Use Import all to load terms from AMIS</span>';
       if (termsEl) termsEl.innerHTML = '';
       if (doPop) popPanel('.gwa-panel-cumul');
@@ -559,8 +722,9 @@ function updateCumulative(options = {}) {
     }
 
     let totalWeighted = 0, totalUnits = 0;
-    keys.forEach(k => {
+    keys.forEach((k) => {
       const t = history[k];
+      if (!t || t.totalUnits <= 0) return;
       if (t.weightSum != null && t.totalUnits > 0) {
         totalWeighted += t.weightSum;
       } else {
@@ -588,13 +752,19 @@ function updateCumulative(options = {}) {
 
     if (!termsEl) return;
     const delayStyle = (i) => (doPop ? ` style="animation-delay:${60 + i * 35}ms"` : '');
-    termsEl.innerHTML = keys.map((k, i) => `
+    termsEl.innerHTML = keys.map((k, i) => {
+      const th = history[k];
+      const u  = th && th.totalUnits != null ? th.totalUnits : 0;
+      const g  = th && th.gwa != null ? String(th.gwa) : '—';
+      const gShow = u > 0 ? g : '—';
+      return `
       <div class="${rowCls}"${delayStyle(i)}>
         <button class="gwa-del" data-term="${escapeAttr(k)}" title="Remove term">✕</button>
         <span class="gwa-code">${escapeHtml(displayNameForTermKey(k))}</span>
-        <span class="gwa-grade">${escapeHtml(String(history[k].gwa))}</span>
+        <span class="gwa-grade">${escapeHtml(gShow)}</span>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     termsEl.querySelectorAll('.gwa-del').forEach(btn => {
       btn.onclick = () => {
@@ -809,17 +979,35 @@ function isBulkAmisBackfillDisabled() {
 
 /**
  * Replace `termHistory` with the current API payload (no merge with prior storage).
+ * Per-term GWA/weights are recomputed with the same PE/NSTP and user-omit rules as the UI.
  */
 function mergeApiTermsIntoStorage(terms) {
   if (isBulkAmisBackfillDisabled()) return;
   if (!terms || !terms.length) return;
-  chrome.storage.local.get(['termHistory'], res => {
+  chrome.storage.local.get(['termHistory'], () => {
     if (isBulkAmisBackfillDisabled()) return;
     const history = {};
     for (const t of terms) {
-      const row = { gwa: t.gwa.toFixed(4), totalUnits: t.totalUnits, count: t.count };
-      if (t.weightSum != null && !isNaN(Number(t.weightSum))) {
-        row.weightSum = Number(t.weightSum);
+      const rec = recomputeTermEntryFromSubjects(t.subjects || [], t.label);
+      if (!t.subjects || !t.subjects.length) continue;
+      if (rec.gwa == null || !rec.totalUnits) {
+        history[t.label] = {
+          gwa: '0.0000',
+          totalUnits: 0,
+          count: 0,
+          weightSum: 0,
+          subjects: t.subjects
+        };
+        continue;
+      }
+      const row = {
+        gwa: rec.gwa.toFixed(4),
+        totalUnits: rec.totalUnits,
+        count: rec.count,
+        subjects: t.subjects || []
+      };
+      if (rec.weightSum != null && !isNaN(Number(rec.weightSum))) {
+        row.weightSum = Number(rec.weightSum);
       }
       history[t.label] = row;
     }
@@ -1219,11 +1407,31 @@ function createOverlay() {
     try {
       sessionStorage.setItem('gwaSkipApiSummarize', '1');
     } catch (e) { /* ignore */ }
-    chrome.storage.local.set({ termHistory: {} }, () => {
+    _gwaUserExcluded = {};
+    chrome.storage.local.set({ termHistory: {}, [_GWA_USER_EXCLUDED_KEY]: {} }, () => {
       showMsg('History cleared.', 'success');
       updateCumulative({ force: true });
     });
   };
+
+  const termListEl = document.getElementById('gwa-term-list');
+  if (termListEl) {
+    termListEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.gwa-omit');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const code = btn.getAttribute('data-code');
+      if (!code) return;
+      const label = getSelectedTermLabel();
+      if (!label) return;
+      if (isExcludedFromCumulativeGwaCourse(code)) return;
+      toggleUserExclusion(label, code, () => {
+        renderSelectedTermFromPicker({ panelPop: false, animate: false });
+        recomputeAndPersistTerm(label);
+      });
+    });
+  }
 
   // Draggable overlay — constrained to viewport with edge gap
   const header = document.getElementById('gwa-header');
@@ -1272,9 +1480,13 @@ function createOverlay() {
 
 // ── Init ──
 function init() {
-  createOverlay();
-  updateCumulative();
-  void loadTermPickerFromApi();
+  chrome.storage.local.get([_GWA_USER_EXCLUDED_KEY], (res) => {
+    const ex = res[_GWA_USER_EXCLUDED_KEY];
+    _gwaUserExcluded = ex && typeof ex === 'object' ? { ...ex } : {};
+    createOverlay();
+    updateCumulative();
+    void loadTermPickerFromApi();
+  });
 }
 
 if (document.readyState === 'loading') {
